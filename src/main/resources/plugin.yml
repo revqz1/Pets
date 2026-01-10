@@ -1,0 +1,17 @@
+name: Pets
+version: '1.0-SNAPSHOT'
+main: me.revqz.pets.Pets
+api-version: '1.21'
+authors: [revqz.exe]
+description: A cosmetic pets plugin using 1.21 Display Entities.
+
+commands:
+  pet:
+    description: Main command to manage pets
+    usage: /pet <give|remove> [args]
+    aliases: [pets]
+
+permissions:
+  pet.give:
+    description: Allows the player to give themselves a custom pet head.
+    default: op
