@@ -12,7 +12,7 @@ leveling:
   xp-per-block: 10       # XP gained per block mined
   strength-per-level: 1  # Extra damage per level
 
-# Variants (Shiny / Rainbow)
+# Variants
 variants:
   shiny-chance: 5.0      # 5% Chance
   shiny-multiplier: 2.0  # 2x Damage
@@ -38,7 +38,7 @@ messages:
   max-pets: "&cMax %max% pets allowed!"
   level-up: "&a&lLEVEL UP! &eYour pet reached Level %level%!"
 
-# --- PLACEHOLDERS LIST (Reference) ---
+# --- PLACEHOLDERS LIST---
 # %pets_active_count%    - Number of pets equipped
 # %pets_max_count%       - Max pets allowed
 # %pets_total_strength%  - Total damage of all equipped pets
