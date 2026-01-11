@@ -3,7 +3,7 @@ version: '1.0-SNAPSHOT'
 main: me.revqz.pets.Pets
 api-version: '1.21'
 authors: [revqz.exe]
-description: A cosmetic pets plugin using 1.21 Display Entities.
+description: Pets plugin :shrug:.
 
 commands:
   pet:
