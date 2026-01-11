@@ -49,6 +49,7 @@ public final class Pets extends JavaPlugin implements Listener, CommandExecutor,
     public static class ActivePet {
         public ItemDisplay model;
         public TextDisplay hologram;
+        public boolean isAnimating = false;
 
         public ActivePet(ItemDisplay model, TextDisplay hologram) {
             this.model = model;
@@ -56,6 +57,7 @@ public final class Pets extends JavaPlugin implements Listener, CommandExecutor,
         }
 
         public void teleport(Location loc) {
+            if (isAnimating) return;
             model.teleport(loc);
             hologram.teleport(loc.clone().add(0, 0.6, 0));
         }
@@ -83,6 +85,10 @@ public final class Pets extends JavaPlugin implements Listener, CommandExecutor,
         Objects.requireNonNull(getCommand("pet")).setTabCompleter(this);
 
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(eggSystem, this);
+
+        // --- NEW LISTENER REGISTRATION ---
+        getServer().getPluginManager().registerEvents(new PetEvents.PetExperienceListener(this), this);
 
         new BukkitRunnable() {
             double tick = 0;
@@ -126,6 +132,7 @@ public final class Pets extends JavaPlugin implements Listener, CommandExecutor,
 
         for (int i = 0; i < pets.size(); i++) {
             ActivePet pet = pets.get(i);
+            if (pet.isAnimating) continue;
 
             int row = i / petsPerRow;
             int col = i % petsPerRow;
@@ -146,7 +153,7 @@ public final class Pets extends JavaPlugin implements Listener, CommandExecutor,
 
             Location targetLoc = playerLoc.clone().add(offsetX, 1.2 + Math.sin(tick * bobSpeed) * (bobHeight * 0.5), offsetZ);
 
-            targetLoc.setYaw(playerLoc.getYaw());
+            targetLoc.setYaw(playerLoc.getYaw() + 180);
             targetLoc.setPitch(0);
 
             pet.model.setTeleportDuration(2);
@@ -172,12 +179,17 @@ public final class Pets extends JavaPlugin implements Listener, CommandExecutor,
     public void onEntityInteract(PlayerInteractEntityEvent event) {
         if (event.getRightClicked() instanceof Interaction interaction) {
             if (interaction.getPersistentDataContainer().has(petItemManager.eggKey, PersistentDataType.BYTE)) {
-                Player player = event.getPlayer();
-                ItemStack hand = player.getInventory().getItemInMainHand();
-                if (petItemManager.isEggItem(hand)) {
-                    eggSystem.playHatchAnimation(player, interaction.getLocation());
+                ItemDisplay display = null;
+                for (ItemDisplay e : interaction.getLocation().getNearbyEntitiesByType(ItemDisplay.class, 1)) {
+                    if (petItemManager.isEggItem(e.getItemStack())) {
+                        display = e;
+                        break;
+                    }
+                }
+                if (display != null) {
+                    eggSystem.startCracking(event.getPlayer(), interaction, display);
                 } else {
-                    player.sendMessage(ChatColor.RED + "You need a Mystery Egg to open this!");
+                    interaction.remove();
                 }
             }
         }
@@ -222,6 +234,7 @@ public final class Pets extends JavaPlugin implements Listener, CommandExecutor,
         if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
             if (playerPets.containsKey(player.getUniqueId()) && !playerPets.get(player.getUniqueId()).isEmpty()) {
                 if (item.getType().isBlock() && item.getType().isSolid()) return;
+                if (petItemManager.isEggItem(item)) return;
                 if (event.getClickedBlock() != null && !event.getClickedBlock().getType().isAir()) {
                     miningSystem.startMining(player, event.getClickedBlock());
                 }
@@ -251,13 +264,9 @@ public final class Pets extends JavaPlugin implements Listener, CommandExecutor,
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (args.length == 0) return false;
 
-        if (args[0].equalsIgnoreCase("placeegg") && sender instanceof Player p && p.hasPermission("pet.admin")) {
-            eggSystem.placeEggStation(p);
-            return true;
-        }
         if (args[0].equalsIgnoreCase("egg") && sender instanceof Player p && p.hasPermission("pet.give")) {
             p.getInventory().addItem(petItemManager.createMysteryEgg(null));
-            p.sendMessage("§aReceived a Mystery Egg!");
+            p.sendMessage("§aReceived a Mystery Egg! Place it to hatch!");
             return true;
         }
         if (args[0].equalsIgnoreCase("remove") && sender instanceof Player p) {
@@ -278,10 +287,8 @@ public final class Pets extends JavaPlugin implements Listener, CommandExecutor,
             String head = args[1];
             int strength = 1;
             PetItemManager.Variant variant = PetItemManager.Variant.NORMAL;
-
             if (args.length >= 3) try { strength = Integer.parseInt(args[2]); } catch(Exception e) {}
             if (args.length >= 4) try { variant = PetItemManager.Variant.valueOf(args[3].toUpperCase()); } catch(Exception e) {}
-
             p.getInventory().addItem(petItemManager.createPetItem(head, strength, PetItemManager.Rarity.COMMON, variant, 1, 0));
             p.sendMessage(getMsg("pet-given").replace("%pet%", head));
             return true;
@@ -302,7 +309,7 @@ public final class Pets extends JavaPlugin implements Listener, CommandExecutor,
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) return List.of("give", "remove", "placeegg", "egg", "trait", "reload");
+        if (args.length == 1) return List.of("give", "remove", "egg", "trait", "reload");
         if (args.length == 2 && args[0].equalsIgnoreCase("trait")) return List.of("on", "off");
         if (args[0].equalsIgnoreCase("give")) {
             if (args.length == 3) return List.of("1", "5", "10");
