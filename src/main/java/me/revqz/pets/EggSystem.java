@@ -41,15 +41,26 @@ public class EggSystem implements Listener {
         event.setCancelled(true);
         Location loc = event.getClickedBlock().getRelative(event.getBlockFace()).getLocation().add(0.5, 0, 0.5);
 
+        Location playerLoc = player.getLocation();
+        org.bukkit.util.Vector direction = playerLoc.toVector().subtract(loc.toVector()).normalize();
+        loc.setDirection(direction);
+        loc.setYaw(loc.getYaw() + 180);
+
         item.setAmount(item.getAmount() - 1);
 
         ItemDisplay display = player.getWorld().spawn(loc.clone().add(0, 0.5, 0), ItemDisplay.class);
         display.setItemStack(plugin.getPetItemManager().createMysteryEgg(null));
         display.setBillboard(Display.Billboard.FIXED);
-        display.setTransformation(new Transformation(new Vector3f(), new AxisAngle4f(), new Vector3f(0.7f, 0.7f, 0.7f), new AxisAngle4f()));
+        display.setTransformation(new Transformation(new Vector3f(), new AxisAngle4f(), new Vector3f(1.5f, 1.5f, 1.5f), new AxisAngle4f()));
+
+        TextDisplay hologram = player.getWorld().spawn(loc.clone().add(0, 1.5, 0), TextDisplay.class);
+        hologram.setText(ChatColor.YELLOW + "" + ChatColor.BOLD + "MYSTERY EGG\n" + ChatColor.WHITE + "Click to open!");
+        hologram.setBillboard(Display.Billboard.CENTER);
+        hologram.setBackgroundColor(org.bukkit.Color.fromARGB(0,0,0,0));
+        hologram.addScoreboardTag("pet_egg_holo");
 
         Interaction interaction = player.getWorld().spawn(loc, Interaction.class);
-        interaction.setInteractionHeight(1.0f);
+        interaction.setInteractionHeight(1.5f);
         interaction.setInteractionWidth(1.0f);
         interaction.getPersistentDataContainer().set(plugin.getPetItemManager().eggKey, PersistentDataType.BYTE, (byte) 1);
 
@@ -59,6 +70,13 @@ public class EggSystem implements Listener {
     public void startCracking(Player player, Interaction interaction, ItemDisplay display) {
         interaction.remove();
         Location loc = display.getLocation();
+
+        for(Entity e : loc.getNearbyEntities(3, 3, 3)){
+            if(e instanceof TextDisplay && e.getScoreboardTags().contains("pet_egg_holo")) {
+                e.remove();
+            }
+        }
+
         PetItemManager.Rarity rarity = plugin.getPetItemManager().rollRarity();
 
         new BukkitRunnable() {
@@ -70,17 +88,16 @@ public class EggSystem implements Listener {
             public void run() {
                 tick++;
 
-                height += 0.02; // Float up
-                rotation += (tick * 0.02); // Accelerate rotation
+                height += 0.02;
+                rotation += (tick * 0.02);
 
                 display.teleport(loc.clone().add(0, height, 0));
 
                 Transformation t = display.getTransformation();
                 t.getLeftRotation().set(new AxisAngle4f(rotation, 0, 1, 0));
 
-                // Beat/Pulse effect
                 if (tick % 10 == 0) {
-                    player.playSound(loc, Sound.BLOCK_NOTE_BLOCK_HAT, 1f, 0.5f + (tick / 50f));
+                    player.playSound(loc, Sound.ENTITY_TURTLE_EGG_CRACK, 1f, 1f + (tick / 50f));
                     player.getWorld().spawnParticle(Particle.CLOUD, display.getLocation().add(0, 0.5, 0), 1, 0, 0, 0, 0);
                 }
 
@@ -104,12 +121,12 @@ public class EggSystem implements Listener {
         else if (roll < 0.05) variant = PetItemManager.Variant.DIAMOND;
         else if (roll < 0.15) variant = PetItemManager.Variant.GOLD;
 
-        ItemStack petItem = plugin.getPetItemManager().createPetItem("MHF_" + rarity.name(), strength, rarity, variant, 1, 0);
+        // FIXED: 7 Arguments
+        ItemStack petItem = plugin.getPetItemManager().createPetItem("MHF_" + rarity.name(), strength, rarity, variant, 1, 0, 0);
 
-        // --- FIXED LINES BELOW ---
+        // FIXED: 1.21 Particles
         player.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, loc.clone().add(0, 0.5, 0), 1);
         player.getWorld().spawnParticle(Particle.FIREWORK, loc.clone().add(0, 0.5, 0), 20, 0.5, 0.5, 0.5, 0.1);
-        // -------------------------
 
         player.playSound(loc, Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.0f);
         player.playSound(loc, Sound.ENTITY_GENERIC_EXPLODE, 0.5f, 1.5f);

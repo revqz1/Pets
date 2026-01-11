@@ -1,24 +1,19 @@
 settings:
+  # Maximum number of pets a player can have equipped at once
   max-pets: 4
+
+  # Distance between pets in the formation
   pet-spacing: 0.8
+
+  # Animation settings for the floating pets
   bob-speed: 0.15
   bob-height: 0.15
+
+  # Texture for the Mystery Egg (Base64 Value)
+  # You can get these from minecraft-heads.com
   egg-texture: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYjY1YWRkY2E5YjcxZDJmZWZhOGU4NWZlNjZkMzk2YWJlYzU5MTQ3NjI3NDFmNGNkN2QzN2I2NzhjZGM1MiJ9fX0="
 
-# Leveling System
-leveling:
-  base-xp-req: 100       # XP needed for level 1 -> 2
-  xp-multiplier: 1.5     # Each level requires 1.5x more XP
-  xp-per-block: 10       # XP gained per block mined
-  strength-per-level: 1  # Extra damage per level
-
-# Variants (Shiny / Rainbow)
-variants:
-  shiny-chance: 5.0      # 5% Chance
-  shiny-multiplier: 2.0  # 2x Damage
-  rainbow-chance: 0.5    # 0.5% Chance
-  rainbow-multiplier: 5.0 # 5x Damage
-
+# Base Strength values for each rarity
 rarity-strength:
   COMMON: 1
   UNCOMMON: 2
@@ -26,10 +21,7 @@ rarity-strength:
   EPIC: 8
   SUPREME: 10
 
-egg-lore:
-  - "&7Right-click to open!"
-  - "&7Contains a random pet."
-
+# Chat Messages
 messages:
   prefix: "&8[&6Pets&8] &r"
   pet-given: "&aGiven pet: &e%pet%"
@@ -37,10 +29,3 @@ messages:
   pet-removed: "&eRemoved pet #%num%."
   max-pets: "&cMax %max% pets allowed!"
   level-up: "&a&lLEVEL UP! &eYour pet reached Level %level%!"
-
-# --- PLACEHOLDERS LIST (Reference) ---
-# %pets_active_count%    - Number of pets equipped
-# %pets_max_count%       - Max pets allowed
-# %pets_total_strength%  - Total damage of all equipped pets
-# %pets_total_level%     - Sum of all pet levels
-# %pets_avg_level%       - Average level of pets

@@ -1,6 +1,5 @@
 package me.revqz.pets;
 
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
@@ -15,7 +14,6 @@ import org.bukkit.persistence.PersistentDataType;
 
 public class PetEvents {
 
-    // --- CUSTOM EVENT ---
     public static class PetBlockBreakEvent extends Event {
         private static final HandlerList handlers = new HandlerList();
         private final Player player;
@@ -37,7 +35,6 @@ public class PetEvents {
         public HandlerList getHandlers() { return handlers; }
     }
 
-    // --- LISTENER ---
     public static class PetExperienceListener implements Listener {
         private final Pets plugin;
 
@@ -51,10 +48,7 @@ public class PetEvents {
             Pets.ActivePet activePet = event.getPet();
             ItemStack petItem = activePet.model.getItemStack();
 
-            // Give XP Reward (e.g., 50 XP per block break)
-            int xpReward = 50;
-
-            givePetXP(player, activePet, petItem, xpReward);
+            givePetXP(player, activePet, petItem, 50);
         }
 
         private void givePetXP(Player player, Pets.ActivePet activePet, ItemStack item, int amount) {
@@ -62,41 +56,30 @@ public class PetEvents {
             double currentXP = pm.getXP(item);
             int level = pm.getLevel(item);
             double reqXp = pm.getRequiredXP(level);
+            int evo = pm.getEvo(item);
 
-            // Add XP
             currentXP += amount;
 
-            // Level Up Logic
             if (currentXP >= reqXp) {
-                currentXP = currentXP - reqXp; // Rollover XP
+                currentXP = currentXP - reqXp;
                 level++;
                 player.sendMessage(ChatColor.GREEN + "" + ChatColor.BOLD + "LEVEL UP! " + ChatColor.WHITE + "Your pet is now Level " + level);
                 player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1, 2);
-
-                // Trigger the Twist Animation
                 plugin.getMiningSystem().playLevelUpAnimation(activePet);
             } else {
-                // Small sound for XP gain
                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.5f);
             }
 
-            // Update NBT Data on the ItemStack
             if (item.getItemMeta() instanceof SkullMeta meta) {
                 meta.getPersistentDataContainer().set(pm.xpKey, PersistentDataType.DOUBLE, currentXP);
                 meta.getPersistentDataContainer().set(pm.levelKey, PersistentDataType.INTEGER, level);
 
-                // Update Lore
-                pm.updatePetLore(meta, PetItemManager.Rarity.COMMON, pm.getStrength(item), pm.getVariant(item), level, currentXP);
+                // FIXED: 7 Arguments
+                pm.updatePetLore(meta, pm.getRarity(item), pm.getStrength(item), pm.getVariant(item), level, currentXP, evo);
                 item.setItemMeta(meta);
 
-                // 1. Update the Floating Head
                 activePet.model.setItemStack(item);
-
-                // 2. Update the Hologram text
-                activePet.updateHologram(level, currentXP, pm.getRequiredXP(level));
-
-                // 3. IMPORTANT: Update the Player's Inventory
-                // We must find the matching item in the inventory and replace it
+                activePet.updateHologram(level, currentXP, pm.getRequiredXP(level), evo);
                 updatePlayerInventory(player, item);
             }
         }
@@ -106,8 +89,6 @@ public class PetEvents {
             for (int i = 0; i < contents.length; i++) {
                 ItemStack is = contents[i];
                 if (is != null && plugin.getPetItemManager().isPetItem(is)) {
-                    // Simple check: if names match, we assume it's the same pet being leveled.
-                    // (For a more advanced system, you would add a unique UUID to every pet item)
                     if (is.getItemMeta().getDisplayName().equals(updatedItem.getItemMeta().getDisplayName())) {
                         player.getInventory().setItem(i, updatedItem);
                         break;

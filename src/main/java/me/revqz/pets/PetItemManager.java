@@ -28,6 +28,8 @@ public class PetItemManager {
     public final NamespacedKey variantKey;
     public final NamespacedKey levelKey;
     public final NamespacedKey xpKey;
+    public final NamespacedKey rarityKey;
+    public final NamespacedKey evoKey;
 
     public enum Variant {
         NORMAL(1.0, ChatColor.GRAY),
@@ -71,26 +73,32 @@ public class PetItemManager {
         this.variantKey = new NamespacedKey(plugin, "pet_variant");
         this.levelKey = new NamespacedKey(plugin, "pet_level");
         this.xpKey = new NamespacedKey(plugin, "pet_xp");
+        this.rarityKey = new NamespacedKey(plugin, "pet_rarity");
+        this.evoKey = new NamespacedKey(plugin, "pet_evo");
     }
 
-    public ItemStack createPetItem(String ownerName, int strength, Rarity rarity, Variant variant, int level, double xp) {
+    public ItemStack createPetItem(String ownerName, int strength, Rarity rarity, Variant variant, int level, double xp, int evo) {
         ItemStack item = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) item.getItemMeta();
 
         if (meta != null) {
             meta.setOwner(ownerName);
             String prefix = (variant != Variant.NORMAL) ? variant.color + "" + ChatColor.BOLD + variant.name() + " " : "";
-            meta.setDisplayName(prefix + rarity.getColor() + ownerName);
+            String evoSuffix = (evo > 0) ? ChatColor.YELLOW + " ⭐" + evo : "";
 
-            updatePetLore(meta, rarity, strength, variant, level, xp);
+            meta.setDisplayName(prefix + rarity.getColor() + ownerName + evoSuffix);
+
+            updatePetLore(meta, rarity, strength, variant, level, xp, evo);
 
             meta.getPersistentDataContainer().set(petKey, PersistentDataType.BYTE, (byte) 1);
             meta.getPersistentDataContainer().set(strengthKey, PersistentDataType.INTEGER, strength);
             meta.getPersistentDataContainer().set(variantKey, PersistentDataType.STRING, variant.name());
+            meta.getPersistentDataContainer().set(rarityKey, PersistentDataType.STRING, rarity.name());
             meta.getPersistentDataContainer().set(levelKey, PersistentDataType.INTEGER, level);
             meta.getPersistentDataContainer().set(xpKey, PersistentDataType.DOUBLE, xp);
+            meta.getPersistentDataContainer().set(evoKey, PersistentDataType.INTEGER, evo);
 
-            if (variant != Variant.NORMAL) {
+            if (variant != Variant.NORMAL || evo > 0) {
                 meta.addEnchant(Enchantment.UNBREAKING, 1, true);
                 meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
             }
@@ -99,31 +107,39 @@ public class PetItemManager {
         return item;
     }
 
-    public void updatePetLore(SkullMeta meta, Rarity rarity, int baseStrength, Variant variant, int level, double currentXp) {
+    public void updatePetLore(SkullMeta meta, Rarity rarity, int baseStrength, Variant variant, int level, double currentXp, int evo) {
         List<String> lore = new ArrayList<>();
-        int totalStrength = (int) ((baseStrength + (level * 2)) * variant.multiplier);
+
+        double evoMult = 1.0 + (evo * 0.2);
+        int totalStrength = (int) ((baseStrength + (level * 2)) * variant.multiplier * evoMult);
         double reqXp = getRequiredXP(level);
 
         lore.add(ChatColor.GRAY + "Rarity: " + rarity.getColor() + rarity.name());
         if (variant != Variant.NORMAL) lore.add(ChatColor.GRAY + "Variant: " + variant.color + variant.name());
+        if (evo > 0) lore.add(ChatColor.GOLD + "Evolution: " + ChatColor.WHITE + evo);
+
         lore.add(ChatColor.GRAY + "Level: " + ChatColor.GREEN + level);
         lore.add(ChatColor.GRAY + "XP: " + ChatColor.AQUA + (int)currentXp + " / " + (int)reqXp);
         lore.add(ChatColor.GRAY + "Damage: " + ChatColor.RED + "⚔ " + totalStrength);
         lore.add("");
-        lore.add(ChatColor.GRAY + "Right-click to equip!");
+        lore.add(ChatColor.GRAY + "Left-click to Equip");
+        lore.add(ChatColor.GRAY + "Right-click to Open Menu");
         meta.setLore(lore);
     }
 
-    public double getRequiredXP(int level) {
-        return 100 * Math.pow(1.2, level - 1);
-    }
+    public double getRequiredXP(int level) { return 100 * Math.pow(1.2, level - 1); }
 
     public ItemStack createMysteryEgg(Rarity fixedRarity) {
         ItemStack item = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) item.getItemMeta();
         if (meta != null) {
             String b64 = plugin.getConfig().getString("settings.egg-texture", "");
-            if (!b64.isEmpty()) applyTexture(meta, b64); else meta.setOwner("MHF_Question");
+            if (b64 != null && !b64.isEmpty()) {
+                applyTexture(meta, b64);
+            } else {
+                meta.setOwner("MHF_Question");
+            }
+
             meta.setDisplayName((fixedRarity == null ? ChatColor.YELLOW + "Mystery" : fixedRarity.getColor() + fixedRarity.name()) + " Pet Egg");
             meta.getPersistentDataContainer().set(eggKey, PersistentDataType.BYTE, (byte) 1);
             if (fixedRarity != null) meta.getPersistentDataContainer().set(eggRarityKey, PersistentDataType.STRING, fixedRarity.name());
@@ -133,9 +149,13 @@ public class PetItemManager {
     }
 
     private void applyTexture(SkullMeta meta, String b64) {
-        PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID());
-        profile.setProperty(new ProfileProperty("textures", b64));
-        meta.setPlayerProfile(profile);
+        try {
+            PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID());
+            profile.setProperty(new ProfileProperty("textures", b64));
+            meta.setPlayerProfile(profile);
+        } catch (Exception e) {
+            meta.setOwner("MHF_Question");
+        }
     }
 
     public boolean isPetItem(ItemStack item) { return item != null && item.hasItemMeta() && item.getItemMeta().getPersistentDataContainer().has(petKey, PersistentDataType.BYTE); }
@@ -146,9 +166,15 @@ public class PetItemManager {
         try { return Variant.valueOf(item.getItemMeta().getPersistentDataContainer().get(variantKey, PersistentDataType.STRING)); } catch (Exception e) { return Variant.NORMAL; }
     }
 
+    public Rarity getRarity(ItemStack item) {
+        if (!isPetItem(item)) return Rarity.COMMON;
+        try { return Rarity.valueOf(item.getItemMeta().getPersistentDataContainer().get(rarityKey, PersistentDataType.STRING)); } catch (Exception e) { return Rarity.COMMON; }
+    }
+
     public int getStrength(ItemStack item) { return !isPetItem(item) ? 0 : item.getItemMeta().getPersistentDataContainer().getOrDefault(strengthKey, PersistentDataType.INTEGER, 0); }
     public int getLevel(ItemStack item) { return !isPetItem(item) ? 1 : item.getItemMeta().getPersistentDataContainer().getOrDefault(levelKey, PersistentDataType.INTEGER, 1); }
     public double getXP(ItemStack item) { return !isPetItem(item) ? 0 : item.getItemMeta().getPersistentDataContainer().getOrDefault(xpKey, PersistentDataType.DOUBLE, 0.0); }
+    public int getEvo(ItemStack item) { return !isPetItem(item) ? 0 : item.getItemMeta().getPersistentDataContainer().getOrDefault(evoKey, PersistentDataType.INTEGER, 0); }
 
     public Rarity rollRarity() {
         int total = 0; for (Rarity r : Rarity.values()) total += r.chance;

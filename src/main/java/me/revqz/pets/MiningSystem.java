@@ -48,7 +48,6 @@ public class MiningSystem {
     public void tickMining(Player player, List<Pets.ActivePet> pets, double tick) {
         Block targetBlock = activeTargets.get(player.getUniqueId());
 
-        // Validation check
         if (targetBlock == null || targetBlock.getType() == Material.AIR || targetBlock.getLocation().distance(player.getLocation()) > 15) {
             stopMining(player);
             return;
@@ -57,70 +56,60 @@ public class MiningSystem {
         Location blockLoc = targetBlock.getLocation().add(0.5, 0.5, 0.5);
         double totalStrength = 0;
 
+        // Increased radius slightly to prevent crowding
+        double circleRadius = 1.0 + (pets.size() * 0.2);
+
         for (int i = 0; i < pets.size(); i++) {
             Pets.ActivePet activePet = pets.get(i);
             ItemDisplay model = activePet.model;
 
-            if (activePet.isAnimating) continue; // Don't interrupt level up animation
+            if (activePet.isAnimating) continue;
 
-            // --- MOVEMENT LOGIC (Walking) ---
+            // Calculate circle position
             double angle = (i * (Math.PI * 2 / pets.size()));
-            Location targetPos = blockLoc.clone().add(Math.cos(angle), 0.5, Math.sin(angle));
+            Location targetPos = blockLoc.clone().add(Math.cos(angle) * circleRadius, 0.5, Math.sin(angle) * circleRadius);
 
-            // Make pet face the block
             targetPos.setDirection(blockLoc.toVector().subtract(targetPos.toVector()));
 
             Location currentPos = model.getLocation();
             double distance = currentPos.distance(targetPos);
 
             if (distance > 1.0) {
-                // If far away, "Walk" towards the target
-                Vector dir = targetPos.toVector().subtract(currentPos.toVector()).normalize().multiply(0.4); // 0.4 speed
+                Vector dir = targetPos.toVector().subtract(currentPos.toVector()).normalize().multiply(0.4);
                 Location nextStep = currentPos.clone().add(dir);
-
-                // Add a little bobbing for walking effect
                 nextStep.setY(targetPos.getY() + Math.sin(tick * 0.4) * 0.1);
-
-                // Maintain look direction
                 nextStep.setDirection(targetPos.toVector().subtract(nextStep.toVector()));
 
                 activePet.teleport(nextStep);
-
-                // Skip mining damage while walking
                 continue;
             } else {
-                // We are close enough: Snap to position and Mine
                 activePet.teleport(targetPos);
             }
 
-            // --- MINING ANIMATION & DAMAGE ---
             float attackPitch = (float) Math.sin(tick * 0.8) * 45;
             Transformation transform = model.getTransformation();
             transform.getLeftRotation().set(new AxisAngle4f((float)Math.toRadians(attackPitch), 1, 0, 0));
             model.setTransformation(transform);
 
-            // Particles
             if (tick % 10 == 0) {
+                // "Hit" sound
+                player.playSound(blockLoc, Sound.BLOCK_NOTE_BLOCK_BELL, 0.5f, 2.0f);
                 model.getWorld().spawnParticle(Particle.CRIT, blockLoc, 3, 0.3, 0.3, 0.3, 0.1);
                 model.getWorld().spawnParticle(Particle.BLOCK, blockLoc, 5, 0.2, 0.2, 0.2, targetBlock.getBlockData());
             }
 
-            // Accumulate Strength
             totalStrength += calculateTotalDamage(model.getItemStack());
         }
 
-        // Only damage block if pets are actually hitting it (strength > 0)
         if (totalStrength > 0) {
             double damagePerTick = totalStrength / 20.0;
             double currentDmg = blockDamage.getOrDefault(targetBlock, 0.0) + damagePerTick;
             blockDamage.put(targetBlock, currentDmg);
 
-            // --- BLOCK BREAK ---
             if (currentDmg >= blockHealth.getOrDefault(targetBlock.getType(), 20)) {
                 targetBlock.getWorld().playEffect(targetBlock.getLocation(), Effect.STEP_SOUND, targetBlock.getType());
                 targetBlock.breakNaturally();
 
-                // Fire the Custom Event for every pet involved
                 for (Pets.ActivePet p : pets) {
                     Bukkit.getPluginManager().callEvent(new PetEvents.PetBlockBreakEvent(player, p, targetBlock));
                 }
@@ -142,21 +131,20 @@ public class MiningSystem {
 
     public void playLevelUpAnimation(Pets.ActivePet pet) {
         pet.isAnimating = true;
-        // Float up
         pet.model.teleport(pet.model.getLocation().add(0, 0.5, 0));
 
         new BukkitRunnable() {
             float angle = 0;
             @Override
             public void run() {
-                angle += 25; // Spin speed
+                angle += 25;
                 Transformation t = pet.model.getTransformation();
                 t.getLeftRotation().set(new AxisAngle4f((float)Math.toRadians(angle), 0, 1, 0));
                 pet.model.setTransformation(t);
 
                 pet.model.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING, pet.model.getLocation().add(0, 0.5, 0), 1);
 
-                if (angle >= 360 * 2) { // Spin twice
+                if (angle >= 360 * 2) {
                     pet.isAnimating = false;
                     this.cancel();
                 }
